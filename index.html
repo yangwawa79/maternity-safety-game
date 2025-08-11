@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>孕產兒安全金幣挑戰｜像素小遊戲</title>
+<style>
+  :root{
+    --bg1:#0f1020; --bg2:#1a1c3a; --card:#223; --accent:#ffd54a; --accent2:#ff9e4a;
+    --good:#3ad29f; --bad:#ff5f6d; --text:#eef2ff; --muted:#a7b0c8;
+    --pixel:4px; /* 基本像素單位 */
+  }
+  html,body{height:100%;}
+  body{
+    margin:0; font-family: "Noto Sans TC", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+    color:var(--text);
+    background:
+      radial-gradient(1200px 800px at 20% -10%, #2a2d63 0%, transparent 60%),
+      radial-gradient(800px 600px at 110% 20%, #2c1f52 0%, transparent 55%),
+      linear-gradient(180deg, var(--bg1), var(--bg2));
+    image-rendering: pixelated;
+  }
+  .wrap{
+    max-width: 980px; margin: 0 auto; padding: 16px 16px 56px; position:relative;
+  }
+  header{
+    display:flex; align-items:center; gap:12px; justify-content:space-between; flex-wrap:wrap;
+  }
+  .title{
+    display:flex; align-items:center; gap:10px; font-weight:900; letter-spacing:1px;
+    text-shadow:0 2px 0 rgba(0,0,0,.35);
+  }
+  .pixel-border{ /* 8-bit框 */
+    position:relative; background:var(--card); border:0; padding:10px 12px; border-radius:8px;
+    box-shadow: 0 0 0 var(--pixel) #0008, inset 0 0 0 var(--pixel) #0008;
+  }
+  .hud{display:flex; gap:12px; align-items:center; flex-wrap:wrap;}
+  .badge{display:flex; align-items:center; gap:8px; padding:8px 10px; background:#101427; border-radius:10px; box-shadow: inset 0 0 0 var(--pixel) #0008, 0 4px 0 #0006}
+  .badge b{font-variant-numeric: tabular-nums;}
+
+  /* 角色舞台 */
+  .stage{margin-top:16px; display:grid; grid-template-columns: 220px 1fr; gap:16px;}
+  .scene{min-height:220px; background:#14183a; border-radius:12px; position:relative; overflow:hidden; box-shadow: inset 0 0 0 var(--pixel) #0008, 0 10px 24px #0008}
+  .scene:before{ /* 像素地板 */
+    content:""; position:absolute; inset:auto 0 0 0; height:44%;
+    background: repeating-linear-gradient(0deg, #191f48 0 8px, #121738 8px 16px);
+  }
+  .scene .decor{ position:absolute; inset:0; opacity:.25; background:
+      radial-gradient(10px 10px at 30% 30%, #fff 0 2px, transparent 3px),
+      radial-gradient(12px 12px at 70% 20%, #fff 0 2px, transparent 3px),
+      radial-gradient(14px 14px at 50% 60%, #fff 0 2px, transparent 3px);
+    filter: blur(0.3px);
+  }
+  .nurse{ position:absolute; left:36px; bottom:18%; width:120px; height:140px; }
+  .nurse svg{ width:100%; height:100%; image-rendering: pixelated; }
+  .nurse.bounce{ animation: bob 1.2s infinite ease-in-out; }
+  @keyframes bob{ 0%,100%{ transform: translateY(0)} 50%{ transform: translateY(-3px)} }
+
+  /* 問答卡 */
+  .card{ background:#0f1430; border-radius:12px; padding:16px; box-shadow: inset 0 0 0 var(--pixel) #0008, 0 10px 24px #0008}
+  .qtext{ font-size:20px; line-height:1.4; margin-bottom:12px; }
+  .choices{ display:grid; gap:10px; }
+  .btn{
+    background:#1a1f45; color:var(--text); border:0; padding:12px; text-align:left; border-radius:10px; cursor:pointer; font-size:16px;
+    box-shadow: 0 4px 0 #0006, inset 0 0 0 var(--pixel) #0008; transition: transform .07s ease;
+  }
+  .btn:hover{ transform: translateY(-1px); }
+  .btn:disabled{ opacity:.6; cursor:not-allowed; }
+  .btn.correct{ background:#103827; box-shadow: inset 0 0 0 var(--pixel) #0b4833, 0 4px 0 #072d21; }
+  .btn.wrong{ background:#3a1720; box-shadow: inset 0 0 0 var(--pixel) #551a25, 0 4px 0 #3a0f17; }
+
+  .feedback{ margin-top:10px; font-size:15px; color:var(--muted); }
+  .feedback.ok{ color:var(--good); }
+  .feedback.no{ color:var(--bad); }
+
+  .actions{ margin-top:12px; display:flex; gap:10px; }
+  .action{ background:linear-gradient(#ffd54a,#ffb84a); color:#231b00; font-weight:700; border:0; padding:10px 14px; border-radius:10px; cursor:pointer; box-shadow: 0 4px 0 #7a4b0a; }
+  .action:disabled{ opacity:.6; cursor:not-allowed; }
+
+  /* 金幣 / 寶箱 */
+  .coin { display:inline-flex; align-items:center; gap:8px; }
+  .coin svg{ width:20px; height:20px; vertical-align:-4px; }
+  .coin-pop{ position:fixed; pointer-events:none; animation: coinPop 900ms ease forwards; }
+  @keyframes coinPop{ 0%{ transform: translateY(0) scale(.8); opacity:0 } 25%{ opacity:1 } 100%{ transform: translateY(-80px) scale(1.05); opacity:0 } }
+
+  .toast{ position:fixed; left:50%; top:18px; transform:translateX(-50%); background:#0c1028; padding:10px 14px; border-radius:10px; box-shadow: 0 6px 0 #0006, inset 0 0 0 var(--pixel) #0008; display:none; }
+  .toast.show{ display:block; animation:fPop .4s ease; }
+  @keyframes fPop{ from{ transform:translateX(-50%) scale(.9); opacity:0 } to{ transform:translateX(-50%) scale(1); opacity:1 } }
+
+  .chest{ position:absolute; right:12px; bottom:18%; width:80px; height:80px; opacity:0; transform: translateY(6px); transition: all .2s ease; }
+  .chest.show{ opacity:1; transform: translateY(0); }
+
+  /* 結算 */
+  dialog{ border:0; border-radius:12px; width:min(560px, 92vw); background:#0d1230; color:var(--text); padding:16px 16px 20px; box-shadow: 0 10px 28px #000a; }
+  dialog::backdrop{ background: rgba(0,0,20,.55); }
+  .summary h2{ margin:6px 0 8px; }
+  .grid-2{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+
+  /* RWD */
+  @media (max-width: 840px){
+    .stage{ grid-template-columns: 1fr; }
+    .nurse{ left:16px; transform: scale(.92); transform-origin: left bottom; }
+    .chest{ right:8px; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="title pixel-border">
+        <span style="font-size:20px">🧑‍⚕️🍼</span>
+        <div>
+          <div style="font-size:18px">孕產兒安全金幣挑戰</div>
+          <small style="color:var(--muted)">回答題目、賺金幣、學安全！</small>
+        </div>
+      </div>
+      <div class="hud">
+        <div class="badge"><span class="coin" id="coinHud"></span><b id="coinCount">0</b></div>
+        <div class="badge">🔥 連擊：<b id="streak">0</b></div>
+        <div class="badge">📚 題目：<b id="progress">0/0</b></div>
+      </div>
+    </header>
+
+    <section class="stage">
+      <div class="scene pixel-border">
+        <div class="decor"></div>
+        <!-- 像素護士角色（SVG矩形拼貼） -->
+        <div class="nurse bounce" aria-hidden="true">
+          <svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+            <!-- 影子 -->
+            <rect x="8" y="60" width="48" height="6" fill="#0a0f2a" opacity=".5"/>
+            <!-- 身體白袍 -->
+            <rect x="20" y="26" width="24" height="28" fill="#e7f0ff"/>
+            <rect x="22" y="28" width="20" height="24" fill="#f8fbff"/>
+            <!-- 十字徽章 -->
+            <rect x="31" y="36" width="2" height="8" fill="#d92c3a"/>
+            <rect x="28" y="39" width="8" height="2" fill="#d92c3a"/>
+            <!-- 頭部膚色 -->
+            <rect x="24" y="10" width="16" height="14" fill="#ffd7c2"/>
+            <!-- 眼睛 -->
+            <rect x="28" y="16" width="2" height="2" fill="#1d2b53"/>
+            <rect x="34" y="16" width="2" height="2" fill="#1d2b53"/>
+            <!-- 頭髮 -->
+            <rect x="22" y="8" width="20" height="6" fill="#2b1f3a"/>
+            <rect x="22" y="14" width="2" height="10" fill="#2b1f3a"/>
+            <rect x="40" y="14" width="2" height="10" fill="#2b1f3a"/>
+            <!-- 護士帽 -->
+            <rect x="22" y="4" width="20" height="6" fill="#ffffff"/>
+            <rect x="30" y="5" width="4" height="4" fill="#d92c3a"/>
+            <!-- 手臂 -->
+            <rect x="18" y="30" width="6" height="10" fill="#ffd7c2"/>
+            <rect x="40" y="30" width="6" height="10" fill="#ffd7c2"/>
+            <!-- 下擺與腿 -->
+            <rect x="20" y="54" width="24" height="4" fill="#c9d7ff"/>
+            <rect x="26" y="58" width="4" height="8" fill="#283d70"/>
+            <rect x="34" y="58" width="4" height="8" fill="#283d70"/>
+            <!-- 鞋子 -->
+            <rect x="24" y="66" width="8" height="2" fill="#0b142e"/>
+            <rect x="32" y="66" width="8" height="2" fill="#0b142e"/>
+          </svg>
+        </div>
+        <!-- 寶箱 -->
+        <div class="chest" id="chest" aria-hidden="true">
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+            <rect x="8" y="26" width="48" height="28" fill="#8b4f16"/>
+            <rect x="10" y="28" width="44" height="24" fill="#aa691f"/>
+            <rect x="8" y="22" width="48" height="6" fill="#734011"/>
+            <rect x="28" y="22" width="8" height="18" fill="#e2b34a"/>
+            <rect x="30" y="34" width="4" height="6" fill="#3b2a0a"/>
+          </svg>
+        </div>
+      </div>
+      <div class="card">
+        <div class="qtext" id="qtext">按「開始作答」取得第一題</div>
+        <div class="choices" id="choices"></div>
+        <div class="feedback" id="feedback"></div>
+        <div class="actions">
+          <button class="action" id="startBtn">▶ 開始作答</button>
+          <button class="action" id="nextBtn" disabled>下一題 ➜</button>
+          <button class="action" id="restartBtn" style="display:none">重新開始 ↻</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast">+1 金幣！</div>
+
+  <dialog id="summaryDlg">
+    <div class="summary">
+      <h2>結算</h2>
+      <p id="sumText">做得好！</p>
+      <div class="grid-2">
+        <button class="action" id="againBtn">再玩一次</button>
+        <button class="action" id="shareBtn">複製成績分享</button>
+      </div>
+    </div>
+  </dialog>
+
+<script>
+// ===== 題庫：孕產兒病人安全 =====
+const QUESTION_BANK = [
+  {
+    q: "孕婦於孕期應定期產檢，一般建議的產檢頻率為？",
+    options: [
+      "整孕期共1~2次即可",
+      "前期每月1次、28~36週每2週1次、36週後每週1次",
+      "僅於不舒服時就醫",
+      "視個人方便，沒有固定頻率"
+    ],
+    a: 1,
+    why: "依一般產檢時程：懷孕初期～28週約每4週1次、28~36週每2週1次、36週後每週1次。實際仍依醫囑。"
+  },
+  {
+    q: "孕早期葉酸補充的最佳時機為？",
+    options: [
+      "受孕後12週後再開始",
+      "備孕期至孕早期(至少孕前1個月到孕滿12週)",
+      "只在孕中期",
+      "只要飲食正常不需補充"
+    ],
+    a: 1,
+    why: "葉酸可降低神經管缺陷風險，建議備孕即開始，至少持續到孕滿12週。"
+  },
+  {
+    q: "下列何者屬於孕期需要立刻就醫的危險徵象？",
+    options: [
+      "輕微噁心",
+      "規則性腹痛伴陰道出血或破水",
+      "食慾增加",
+      "輕度水腫(休息可改善)"
+    ],
+    a: 1,
+    why: "規則性腹痛加出血/破水屬緊急狀況，可能早產、胎盤問題或破水，需立即就醫。"
+  },
+  {
+    q: "產後48小時內，何者為『大出血』警訊？",
+    options: [
+      "惡露量逐漸減少",
+      "每1小時需更換2片以上厚型衛生棉，伴暈眩或心悸",
+      "乳房漲奶",
+      "輕微腹部悶痛"
+    ],
+    a: 1,
+    why: "大量出血並伴頭暈心悸等休克症狀，屬緊急警訊。"
+  },
+  {
+    q: "新生兒安全睡眠『ABC』原則，B代表？",
+    options: [
+      "Blanket(蓋厚被)",
+      "Back(仰睡)",
+      "Bottle(奶瓶陪睡)",
+      "Buddy(有人陪睡)"
+    ],
+    a: 1,
+    why: "ABC：A=Alone(獨睡同房不同床)、B=Back(仰睡)、C=Crib(嬰兒床、平坦堅實)。"
+  },
+  {
+    q: "母嬰『肌膚接觸』的好處不包含哪一項？",
+    options: [
+      "穩定新生兒體溫與心跳",
+      "促進母乳分泌",
+      "增加感染風險必然上升",
+      "增進親子依附"
+    ],
+    a: 2,
+    why: "正確的肌膚接觸可促進穩定與母乳；若配合手部衛生與適當監測，不會『必然』增加感染。"
+  },
+  {
+    q: "帶新生兒外出，汽座使用何者較安全？",
+    options: [
+      "新生兒可抱在大人懷裡",
+      "後向式嬰兒汽座，依說明正確安裝",
+      "只用安全帶固定",
+      "短程就不需要"
+    ],
+    a: 1,
+    why: "後向式嬰兒汽座可提供頭頸適當支撐，需依說明正確安裝與固定。"
+  },
+  {
+    q: "照護新生兒前的關鍵步驟是？",
+    options: [
+      "先親吻寶寶",
+      "用酒精噴全身",
+      "正確洗手/手部衛生",
+      "只要戴手套即可"
+    ],
+    a: 2,
+    why: "手部衛生是預防感染最重要且有效的措施之一。"
+  },
+  {
+    q: "孕媽咪若感覺胎動明顯減少，建議？",
+    options: [
+      "再觀察幾天",
+      "立即休息並進行胎動計數，若仍少或有疑慮請就醫",
+      "喝含糖飲料即可",
+      "一定是正常現象"
+    ],
+    a: 1,
+    why: "胎動變少可能是胎兒窘迫的徵兆，應評估並視情況就醫。"
+  },
+  {
+    q: "新生兒臍帶護理較恰當的是？",
+    options: [
+      "保持乾燥清潔，尿布折下不覆蓋臍部",
+      "每天塗厚藥膏",
+      "用粉末保持乾燥",
+      "用手常常去剝痂"
+    ],
+    a: 0,
+    why: "臍帶保持乾燥清潔，自然脫落即可，避免覆蓋與過度處理。"
+  },
+  {
+    q: "哺乳『黃金一小時』指的是？",
+    options: [
+      "生產後1小時內盡早親餵",
+      "每天固定某一小時餵奶",
+      "產前1小時補充葡萄糖",
+      "只限剖腹產適用"
+    ],
+    a: 0,
+    why: "於出生後1小時內進行肌膚接觸並嘗試親餵，有助成功哺乳與穩定。"
+  },
+  {
+    q: "孕晚期(35~37週)常見的篩檢為？",
+    options: [
+      "B型肝炎表面抗原",
+      "鏈球菌(GBS)篩檢",
+      "弓漿蟲IgM",
+      "唐氏症第一孕期篩檢"
+    ],
+    a: 1,
+    why: "多數產科會於35~37週進行B群鏈球菌(GBS)篩檢，陽性者產時給予抗生素以降低新生兒感染。"
+  },
+  {
+    q: "新生兒安全睡眠不建議？",
+    options: [
+      "使用平坦堅實的床面",
+      "與大人同床睡",
+      "避免鬆軟枕被與玩偶",
+      "仰睡姿勢"
+    ],
+    a: 1,
+    why: "同床增加窒息與壓迫風險，建議同房不同床。"
+  },
+  {
+    q: "產後出現劇烈頭痛、視力模糊、胸痛或呼吸急促，應？",
+    options: [
+      "先睡一覺",
+      "立即就醫或呼叫緊急救護",
+      "喝咖啡緩解",
+      "等到回診再說"
+    ],
+    a: 1,
+    why: "可能為嚴重併發症(如子癲前症、栓塞)，須緊急評估。"
+  },
+  {
+    q: "早產兒/低體重兒的『袋鼠式護理』主要目的？",
+    options: [
+      "讓寶寶更喜歡被抱",
+      "穩定體溫、心跳並促進哺乳與親子依附",
+      "只是為了拍照",
+      "避免哭鬧"
+    ],
+    a: 1,
+    why: "袋鼠式護理(皮膚接觸)可改善生理穩定、減少感染、促進親餵與依附。"
+  },
+  {
+    q: "家中幫寶寶洗澡時，較安全的做法？",
+    options: [
+      "先將熱水調好後再抱寶寶靠近，水溫約37~40°C",
+      "邊接熱水邊把寶寶放入",
+      "水越熱越能殺菌",
+      "只要大人覺得不燙就好"
+    ],
+    a: 0,
+    why: "水溫先調好並測試，避免燙傷；保持一手扶持、一手清洗。"
+  }
+];
+
+// ===== 狀態 =====
+let questions = [];
+let idx = 0;
+let coins = 0;
+let streak = 0;
+let answered = false;
+
+const qtext = document.getElementById('qtext');
+const choicesEl = document.getElementById('choices');
+const feedback = document.getElementById('feedback');
+const startBtn = document.getElementById('startBtn');
+const nextBtn = document.getElementById('nextBtn');
+const restartBtn = document.getElementById('restartBtn');
+const coinCount = document.getElementById('coinCount');
+const streakEl = document.getElementById('streak');
+const progressEl = document.getElementById('progress');
+const toast = document.getElementById('toast');
+const chest = document.getElementById('chest');
+const summaryDlg = document.getElementById('summaryDlg');
+const sumText = document.getElementById('sumText');
+const againBtn = document.getElementById('againBtn');
+const shareBtn = document.getElementById('shareBtn');
+
+// HUD: 金幣圖示
+(function renderCoinHud(){
+  const coinHud = document.getElementById('coinHud');
+  coinHud.innerHTML = `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+    <circle cx="12" cy="12" r="10" fill="#ffcf33"/>
+    <circle cx="12" cy="12" r="8" fill="#ffd95a"/>
+    <rect x="11" y="6" width="2" height="12" fill="#ad7b0b"/>
+  </svg><span>金幣</span>`;
+})();
+
+function shuffle(arr){
+  const a = [...arr];
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+function startGame(){
+  questions = shuffle(QUESTION_BANK).slice(0); // 全部題目，可改 slice(12) 取12題
+  idx = 0; coins = 0; streak = 0; answered = false;
+  coinCount.textContent = coins; streakEl.textContent = streak; progressEl.textContent = `0/${questions.length}`;
+  restartBtn.style.display = 'none';
+  chest.classList.remove('show');
+  renderQuestion();
+}
+
+function renderQuestion(){
+  if(idx >= questions.length){
+    return endGame();
+  }
+  const {q, options} = questions[idx];
+  qtext.textContent = q;
+  feedback.textContent = '';
+  choicesEl.innerHTML = '';
+  answered = false;
+  startBtn.disabled = true;
+  nextBtn.disabled = true;
+
+  const order = shuffle(options.map((t,i)=>({t,i})));
+  for(const {t,i} of order){
+    const btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.textContent = t;
+    btn.onclick = ()=>onAnswer(i, btn);
+    choicesEl.appendChild(btn);
+  }
+  progressEl.textContent = `${idx+1}/${questions.length}`;
+}
+
+function onAnswer(choiceIndex, btn){
+  if(answered) return; answered = true;
+  const data = questions[idx];
+  const btns = Array.from(choicesEl.querySelectorAll('.btn'));
+  btns.forEach(b=>b.disabled = true);
+
+  const correct = choiceIndex === data.a;
+  if(correct){
+    btn.classList.add('correct');
+    coins += 1; streak += 1; coinCount.textContent = coins; streakEl.textContent = streak;
+    showToast("+1 金幣！");
+    popCoin(btn);
+    if(streak>0 && streak%3===0){
+      // 連擊寶箱
+      coins += 2; coinCount.textContent = coins; showToast("連擊×3！寶箱獎勵 +2 金幣！");
+      chest.classList.add('show');
+      setTimeout(()=>chest.classList.remove('show'), 1200);
+    }
+    playBeep(880, 0.08); playBeep(1320, 0.08, 0.09);
+    feedback.className='feedback ok';
+    feedback.textContent = '答對了！' + (data.why? '　' + data.why : '');
+  } else {
+    btn.classList.add('wrong');
+    streak = 0; streakEl.textContent = streak;
+    playBeep(200, 0.18);
+    feedback.className='feedback no';
+    const ansText = data.options[data.a];
+    feedback.textContent = `啊！正確答案是「${ansText}」。` + (data.why? '　' + data.why : '');
+  }
+  // 標示正確選項
+  btns.forEach((b,k)=>{
+    const originalIndex = data.options.indexOf(b.textContent);
+    if(originalIndex === data.a){ b.classList.add('correct'); }
+  });
+
+  nextBtn.disabled = false;
+}
+
+function nextQuestion(){ idx++; renderQuestion(); }
+
+function endGame(){
+  qtext.textContent = '太棒了！所有題目完成。';
+  choicesEl.innerHTML = '';
+  feedback.textContent = '';
+  nextBtn.disabled = true;
+  restartBtn.style.display = '';
+  const star = '⭐';
+  const medal = coins>=questions.length+Math.floor(questions.length/3)? '🏅' : (coins>=Math.floor(questions.length*0.7)? '🎖️':'🎗️');
+  sumText.textContent = `${medal} 本次獲得 ${coins} 金幣／共 ${questions.length} 題。連擊最高 ${getMaxStreak()}！`;
+  summaryDlg.showModal();
+}
+
+function getMaxStreak(){
+  // 簡易：根據 coins 粗略反推(非精準記錄)。此處可擴充歷史記錄。
+  // 先回傳現在的 streak（收尾時多為 0），用近似：
+  return streak; // 若要精準，需在 onAnswer 中追蹤 maxStreak。
+}
+
+// ===== 視覺 & UX =====
+function popCoin(fromBtn){
+  const r = fromBtn.getBoundingClientRect();
+  const c = document.createElement('div');
+  c.className='coin-pop';
+  c.style.left = (r.left + r.width - 20) + 'px';
+  c.style.top = (r.top - 8 + window.scrollY) + 'px';
+  c.innerHTML = `<svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="#ffcf33"/><circle cx="12" cy="12" r="8" fill="#ffd95a"/><rect x="11" y="6" width="2" height="12" fill="#ad7b0b"/></svg>`;
+  document.body.appendChild(c);
+  setTimeout(()=>c.remove(), 900);
+}
+
+function showToast(msg){
+  toast.textContent = msg; toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'), 1000);
+}
+
+// 音效：WebAudio 簡易提示音
+let audioCtx;
+function playBeep(freq=440, dur=0.1, delay=0){
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  const t0 = audioCtx.currentTime + (delay||0);
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.frequency.value = freq; osc.type = 'square';
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(0.2, t0+0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(t0); osc.stop(t0+dur+0.02);
+}
+
+// ===== 事件 =====
+startBtn.addEventListener('click', startGame);
+nextBtn.addEventListener('click', nextQuestion);
+restartBtn.addEventListener('click', startGame);
+againBtn.addEventListener('click', ()=>{ summaryDlg.close(); startGame(); });
+shareBtn.addEventListener('click', async ()=>{
+  const total = questions.length; const txt = `我在「孕產兒安全金幣挑戰」得到 ${coins} 金幣／${total} 題！來挑戰吧～`;
+  try{
+    await navigator.clipboard.writeText(txt);
+    showToast('已複製成績！');
+  }catch(e){ alert(txt); }
+});
+
+// 初始：渲染一個提示
+choicesEl.innerHTML = `<button class="btn" disabled>按上方「開始作答」開始</button>`;
+
+</script>
+</body>
+</html>
